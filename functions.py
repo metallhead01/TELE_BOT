@@ -1,16 +1,13 @@
-from telegram.ext import Updater
-from telegram.ext import CommandHandler
-from telegram.ext import MessageHandler, Filters
-from win32api import GetFileVersionInfo, LOWORD, HIWORD
-from lxml import etree
-from telebot import types
-import telebot
+import sqlite3
+import json
 import logging
 import requests
 import xml.etree.ElementTree as ET
 import urllib3
 import base64
 import re
+from win32api import GetFileVersionInfo, LOWORD, HIWORD
+
 
 FORMAT = '%(asctime)s : LOG : %(levelname)s - %(message)s'
 logger_my_functions = logging.getLogger()
@@ -69,7 +66,7 @@ class RequestIdRole:
                 for item in parsed_BLOB.findall("./DLVEmployee/inExpTakeOut"):
                     in_exp_take_out = item.text
             if expeditor_role_id and in_exp_take_out is not None:
-                logger_my_functions.debug("expeditor_role_id and in_exp_take_out values were taken.")
+                logger_my_functions.debug("expeditor_role_id and in_exp_take_out values has been taken.")
             else:
                 logger_my_functions.debug("expeditor_role_id and in_exp_take_out values receiving error.")
         else:
@@ -95,11 +92,23 @@ class RequestIdExp:
 
     def id_exp_request(self):
         role_id = RequestIdRole("172.22.3.86", "4545", "Admin_QSR", "190186")
-        role_id.role_id_request()
+        role_id_get = role_id.role_id_request()
+        exp_id_dict = {}
         xml_request_string_ask_IDs_exp = '<RK7Query><RK7CMD CMD="GetRefData" RefName="Restaurants" IgnoreEnums="1" WithChildItems="3" WithMacroProp="1" OnlyActive = "1" PropMask="RIChildItems.(Ident,Name,genRestIP,genprnStation,genDefDlvCurrency,AltName,RIChildItems.TRole(ItemIdent,passdata,Name,AltName,gen*,RIChildItems.(Ident,Name,AltName,gen*)))"/></RK7Query>'
         ip_string = 'https://' + self.i + ":" + self.p + '/rk7api/v0/xmlinterface.xml'
         urllib3.disable_warnings()
-        response_GUID_IDs_exp = requests.get(ip_string, data=xml_request_string_ask_IDs_exp, auth=(self.user_name, self.pass_word),
-                                     verify=False)
+        response_GUID_IDs_exp = requests.get(ip_string, data=xml_request_string_ask_IDs_exp, auth=(self.user_name, self.pass_word),verify=False)
         parsed_element_IDs_exp = ET.fromstring(response_GUID_IDs_exp.content)
-        #for item in parsed_element_IDs_exp.findall("./RK7Reference/RIChildItems/TRK7Restaurant/RIChildItems/TRole"):
+        for elem in parsed_element_IDs_exp.iterfind('RK7Reference/RIChildItems/TRK7Restaurant/RIChildItems/TRole[@ItemIdent="' + str(role_id_get[0][0]) + '"]/RIChildItems/TEmployee'):
+            exp_id_dict[elem.attrib.get('Name')] = (elem.attrib.get('Ident'))
+        if exp_id_dict:
+            logger_my_functions.debug("Expeditors ID`s has been taken")
+        else:
+            logger_my_functions.debug("Expeditors ID`s values received error")
+        print(exp_id_dict.items())
+
+        filename = 'phones.json'
+        phones = []
+        with open(filename, 'r') as f_obj:
+            file_import = json.load(f_obj)
+
